@@ -1,4 +1,4 @@
-import { $query, $update, Record, StableBTreeMap, Vec, match, Result, nat64, ic, Opt } from 'azle';
+import { $query, $update, Record, StableBTreeMap, Vec, Result, nat64, ic } from 'azle';
 import { v4 as uuidv4 } from 'uuid';
 
 // Define a type for energy harvesting records
@@ -17,13 +17,6 @@ type EnergyHarvester = Record<{
     energyRecords: Vec<EnergyRecord>; // Store energy harvesting records
 }>;
 
-// Payload type for adding energy harvesting records
-type EnergyPayload = Record<{
-    name: string;
-    location: string;
-    energyRecords: Vec<EnergyRecord>;
-}>;
-
 // Initialize storage for energy harvesters
 const energyHarvesterStorage = new StableBTreeMap<string, EnergyHarvester>(0, 44, 1024);
 
@@ -33,7 +26,7 @@ const energyHarvesterStorage = new StableBTreeMap<string, EnergyHarvester>(0, 44
  * @returns A Result containing the new energy harvester or an error message.
  */
 $update;
-export function addEnergyHarvester(payload: EnergyPayload): Result<EnergyHarvester, string> {
+export function addEnergyHarvester(payload: EnergyHarvester): Result<EnergyHarvester, string> {
     // Validate inputs and handle incomplete or invalid data
     if (!payload.name || !payload.location || payload.energyRecords.length === 0) {
         return Result.Err<EnergyHarvester, string>('Missing required fields in the energy harvester object');
@@ -41,12 +34,10 @@ export function addEnergyHarvester(payload: EnergyPayload): Result<EnergyHarvest
 
     try {
         // Generate a unique ID for the energy harvester
-        const harvesterId = ic.time().toString(); // Using timestamp as ID for simplicity
+        const harvesterId = uuidv4();
         const newHarvester: EnergyHarvester = {
             id: harvesterId,
-            name: payload.name,
-            location: payload.location,
-            energyRecords: payload.energyRecords
+            ...payload
         };
 
         // Add the energy harvester to storage
@@ -87,10 +78,7 @@ export function getEnergyHarvester(id: string): Result<EnergyHarvester, string> 
 
     try {
         // Retrieve a specific energy harvester by ID
-        return match(energyHarvesterStorage.get(id), {
-            Some: (harvester) => Result.Ok<EnergyHarvester, string>(harvester),
-            None: () => Result.Err<EnergyHarvester, string>(`Energy harvester with id=${id} not found`),
-        });
+        return Result.Ok(energyHarvesterStorage.get(id));
     } catch (error) {
         return Result.Err<EnergyHarvester, string>(`Error retrieving energy harvester by ID: ${error}`);
     }
@@ -100,7 +88,7 @@ export function getEnergyHarvester(id: string): Result<EnergyHarvester, string> 
 
 // Function for validating UUIDs (unchanged)
 export function isValidUUID(id: string): boolean {
-    return /^[\da-f]{8}-([\da-f]{4}-){3}[\da-f]{12}$/i.test(id);
+    return uuidv4.validate(id);
 }
 
 /**
